@@ -30,8 +30,10 @@ export class PaymentComponent implements OnInit {
     this.activatedRoute.queryParams.subscribe((queryParams) => {
       console.log('queryParams: ', queryParams);
       let token = queryParams['token']
-      const arrayToken = token.split('.');
-      this.tokenData = JSON.parse(atob(arrayToken[1]));
+      if(token) {
+        const arrayToken = token.split('.');
+        this.tokenData = JSON.parse(atob(arrayToken[1]));
+      }
       console.log('tokenData: ', this.tokenData)
     })
 
