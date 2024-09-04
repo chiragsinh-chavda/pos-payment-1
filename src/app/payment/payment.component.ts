@@ -34,7 +34,6 @@ export class PaymentComponent implements OnInit {
         const arrayToken = token.split('.');
         this.tokenData = JSON.parse(atob(arrayToken[1]));
       }
-      console.log('tokenData: ', this.tokenData)
     })
 
     await this.getOrderInfo()
@@ -42,12 +41,10 @@ export class PaymentComponent implements OnInit {
 
   async getOrderInfo() {
     try {
-      if (this.tokenData && this.tokenData.venueId && this.tokenData.orderId) {
-        this.httpClient.get(`${environment.serverUrl}/posapi/venues/${this.tokenData.venueId}/order/${this.tokenData.orderId}`).subscribe(async (res: any) => {
+      if (this.tokenData && this.tokenData.locationId && this.tokenData.orderId) {
+        this.httpClient.get(`${environment.serverUrl}/posapi/location/${this.tokenData.locationId}/order/${this.tokenData.orderId}`).subscribe(async (res: any) => {
           if (res && res.data) {
-            console.log('order res: ', res);
             this.orderData = res.data
-            // Fetch payment intent and initialize payment form
             await this.initializePayment();
           } else {
             console.error('payment data not found.')
@@ -62,21 +59,20 @@ export class PaymentComponent implements OnInit {
   }
 
   async initializePayment() {
-    console.log('this.tokenData: ->>>>>>', this.tokenData);
-    console.log('this.orderData: ->>>>>>', this.orderData);
     try {
       if (this.orderData) {
         let payload = {
-          amount: this.orderData.amount || 1000
+          amount: this.orderData.totalOrderPrice,
+          orderId: this.orderData._id,
+          locationId: this.orderData.location,
+          customer: this.orderData.customer,
+          orderNumber: this.orderData.orderNumber
         }
 
         this.httpClient.post(`${environment.serverUrl}/posapi/create-payment-intent`, payload).subscribe((res: any) => {
           if (res && res.data) {
-            console.log('PAYMENT res: ', res);
-            // let dpmCheckerLink = res.data.dpmCheckerLink
             this.clientSecret = res.data.clientSecret;
             let clientSecret = this.clientSecret
-
             const appearance: Appearance = {
               theme: 'stripe',
             };
@@ -85,10 +81,8 @@ export class PaymentComponent implements OnInit {
             const paymentElementOptions: StripePaymentElementOptions = {
               layout: "tabs",
             };
-
             const paymentElement = this.elements.create("payment", paymentElementOptions);
             paymentElement.mount("#payment-element");
-            // this.setDpmCheckerLink(dpmCheckerLink);
           }
         })
       } else {
@@ -108,32 +102,18 @@ export class PaymentComponent implements OnInit {
 
     this.setLoading(true);
 
-    this.stripe.confirmCardPayment(this.clientSecret)
-      .then((result) => {
-        console.log('confirm payment: ->>>>>>', result)
-        // Handle result.error or result.paymentIntent
-        console.log('error: ', result.error);
-        if (result.error?.type === "card_error" || result.error?.type === "validation_error") {
-          this.showMessage(result.error.message);
-        } else {
-          this.showMessage("An unexpected error occurred.");
-        }
-      });
+    const payment = await this.stripe.confirmPayment({
+      elements: this.elements,
+      confirmParams: {
+        return_url: `${environment.liveURL}success`,
+      },
+    });
 
-    // const { error } = await this.stripe.confirmPayment({
-    //   elements: this.elements,
-    //   confirmParams: {
-    //     // Make sure to change this to your payment completion page
-    //     return_url: "http://localhost:4300/success",
-    //   },
-    // });
-
-    // console.log('error: ', error);
-    // if (error?.type === "card_error" || error?.type === "validation_error") {
-    //   this.showMessage(error.message);
-    // } else {
-    //   this.showMessage("An unexpected error occurred.");
-    // }
+    if (payment.error?.type === "card_error" || payment.error?.type === "validation_error") {
+      this.showMessage(payment.error.message);
+    } else {
+      this.showMessage("An unexpected error occurred.");
+    }
 
     this.setLoading(false);
   }
@@ -151,7 +131,6 @@ export class PaymentComponent implements OnInit {
   }
 
   setLoading(isLoading: boolean) {
-    console.log('isLoading: ', isLoading);
     const submitButton = document.querySelector("#submit") as HTMLButtonElement;
     const spinner = document.querySelector("#spinner") as HTMLElement;
     const buttonText = document.querySelector("#button-text") as HTMLElement;
@@ -167,8 +146,4 @@ export class PaymentComponent implements OnInit {
     }
   }
 
-  // setDpmCheckerLink(url: string) {
-  //   const dpmIntegrationChecker = document.querySelector("#dpm-integration-checker") as HTMLAnchorElement;
-  //   dpmIntegrationChecker.href = url;
-  // }
 }
