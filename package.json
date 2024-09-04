@@ -4,7 +4,7 @@
   "scripts": {
     "ng": "ng",
     "start": "ng serve --port 4300",
-    "build": "ng build",
+    "build": "ng build && node src/copy_redirect.js",
     "watch": "ng build --watch --configuration development",
     "test": "ng test"
   },
