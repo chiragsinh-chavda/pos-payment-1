@@ -17,4 +17,4 @@ fs.copyFile(source, destination, (err) => {
   } else {
     console.log('_redirects file copied successfully.');
   }
-});
+}); 
