@@ -16,6 +16,7 @@ export class PaymentComponent implements OnInit {
   clientSecret: any = null;
   tokenData: any = null
   orderData: any = null
+  customerData: any = null
 
   constructor(
     private httpClient: HttpClient,
@@ -36,37 +37,42 @@ export class PaymentComponent implements OnInit {
       }
     })
 
-    await this.getOrderInfo()
-  }
+    // await this.getOrderInfo()
 
-  async getOrderInfo() {
-    try {
-      if (this.tokenData && this.tokenData.locationId && this.tokenData.orderId) {
-        this.httpClient.get(`${environment.serverUrl}/posapi/location/${this.tokenData.locationId}/order/${this.tokenData.orderId}`).subscribe(async (res: any) => {
-          if (res && res.data) {
-            this.orderData = res.data
-            await this.initializePayment();
-          } else {
-            console.error('payment data not found.')
-          }
-        })
-      } else {
-        console.error('Token data not found from params.')
-      }
-    } catch (error) {
-      console.error(error)
+    if (this.tokenData && this.tokenData.paymentTokenId) {
+      this.customerData = this.tokenData.customer
+      await this.initializePayment();
     }
   }
+
+  // async getOrderInfo() {
+  //   try {
+  //     if (this.tokenData && this.tokenData.locationId && this.tokenData.orderId) {
+  //       this.httpClient.get(`${environment.serverUrl}/posapi/location/${this.tokenData.locationId}/order/${this.tokenData.orderId}`).subscribe(async (res: any) => {
+  //         if (res && res.data) {
+  //           this.orderData = res.data
+  //           await this.initializePayment();
+  //         } else {
+  //           console.error('payment data not found.')
+  //         }
+  //       })
+  //     } else {
+  //       console.error('Token data not found from params.')
+  //     }
+  //   } catch (error) {
+  //     console.error(error)
+  //   }
+  // }
 
   async initializePayment() {
     try {
       if (this.orderData) {
         let payload = {
-          amount: this.orderData.totalOrderPrice,
-          orderId: this.orderData._id,
-          locationId: this.orderData.location,
-          customer: this.orderData.customer,
-          orderNumber: this.orderData.orderNumber
+          amount: this.tokenData.amount,
+          orderId: this.tokenData.orderId,
+          locationId: this.tokenData.locationId,
+          customer: this.customerData,
+          orderNumber: this.tokenData.orderNumber
         }
 
         this.httpClient.post(`${environment.serverUrl}/posapi/create-payment-intent`, payload).subscribe((res: any) => {
