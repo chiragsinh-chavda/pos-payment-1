@@ -3,6 +3,7 @@ import { loadStripe, Stripe, StripeElements, Appearance, StripePaymentElementOpt
 import { environment } from '../environments/environment';
 import { HttpClient } from '@angular/common/http';
 import { ActivatedRoute, Router } from '@angular/router';
+import { LocalStorageService } from '../local-storage.service';
 
 @Component({
   selector: 'app-payment',
@@ -21,7 +22,8 @@ export class PaymentComponent implements OnInit {
   constructor(
     private httpClient: HttpClient,
     private router: Router,
-    private activatedRoute: ActivatedRoute
+    private activatedRoute: ActivatedRoute,
+    private localStorageService: LocalStorageService
   ) { }
 
   async ngOnInit() {
@@ -31,9 +33,10 @@ export class PaymentComponent implements OnInit {
     this.activatedRoute.queryParams.subscribe((queryParams) => {
       console.log('queryParams: ', queryParams);
       let token = queryParams['token']
-      if(token) {
+      if (token) {
         const arrayToken = token.split('.');
         this.tokenData = JSON.parse(atob(arrayToken[1]));
+        this.localStorageService.setItem('orderData', JSON.stringify(this.tokenData));
       }
     })
 
@@ -66,34 +69,34 @@ export class PaymentComponent implements OnInit {
 
   async initializePayment() {
     try {
-      if (this.orderData) {
-        let payload = {
-          amount: this.tokenData.amount,
-          orderId: this.tokenData.orderId,
-          locationId: this.tokenData.locationId,
-          customer: this.customerData,
-          orderNumber: this.tokenData.orderNumber
-        }
-
-        this.httpClient.post(`${environment.serverUrl}/posapi/create-payment-intent`, payload).subscribe((res: any) => {
-          if (res && res.data) {
-            this.clientSecret = res.data.clientSecret;
-            let clientSecret = this.clientSecret
-            const appearance: Appearance = {
-              theme: 'stripe',
-            };
-            this.elements = this.stripe!.elements({ appearance, clientSecret });
-
-            const paymentElementOptions: StripePaymentElementOptions = {
-              layout: "tabs",
-            };
-            const paymentElement = this.elements.create("payment", paymentElementOptions);
-            paymentElement.mount("#payment-element");
-          }
-        })
-      } else {
-        console.error('Order data not found to process payment...')
+      // if (this.orderData) {
+      let payload = {
+        amount: this.tokenData.amount,
+        orderId: this.tokenData.orderId,
+        locationId: this.tokenData.locationId,
+        customer: this.customerData,
+        orderNumber: this.tokenData.orderNumber
       }
+
+      this.httpClient.post(`${environment.serverUrl}/posapi/create-payment-intent`, payload).subscribe((res: any) => {
+        if (res && res.data) {
+          this.clientSecret = res.data.clientSecret;
+          let clientSecret = this.clientSecret
+          const appearance: Appearance = {
+            theme: 'stripe',
+          };
+          this.elements = this.stripe!.elements({ appearance, clientSecret });
+
+          const paymentElementOptions: StripePaymentElementOptions = {
+            layout: "tabs",
+          };
+          const paymentElement = this.elements.create("payment", paymentElementOptions);
+          paymentElement.mount("#payment-element");
+        }
+      })
+      // } else {
+      //   console.error('Order data not found to process payment...')
+      // }
     } catch (error) {
       console.error(error)
     }

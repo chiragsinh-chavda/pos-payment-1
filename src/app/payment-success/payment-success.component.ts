@@ -2,7 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { loadStripe, Stripe, StripeElements, Appearance, StripePaymentElementOptions } from '@stripe/stripe-js';
 import { environment } from '../environments/environment';
 import { ActivatedRoute } from '@angular/router';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { CurrencyPipe } from '@angular/common';
+import { LocalStorageService } from '../local-storage.service';
 
 @Component({
   selector: 'app-payment-success',
@@ -17,11 +19,13 @@ export class PaymentSuccessComponent implements OnInit {
   paymentIntent: any = null;
   paymentIntentClientSecret: any = null;
   redirectStatus: any = null;
-  paymentData : any = null;
+  paymentData: any = null;
 
   constructor(
     private activatedRoute: ActivatedRoute,
     private httpClient: HttpClient,
+    private currencyPipe: CurrencyPipe,
+    private localStorageService: LocalStorageService
   ) { }
 
   async ngOnInit() {
@@ -41,15 +45,58 @@ export class PaymentSuccessComponent implements OnInit {
   async getPaymentIntent() {
     try {
       if (this.paymentIntent) {
-        this.httpClient.get(`${environment.serverUrl}/posapi/payment-intent/${this.paymentIntent}`).subscribe((res: any) => {
+        this.httpClient.get(`${environment.serverUrl}/posapi/payment-intent/${this.paymentIntent}`).subscribe(async (res: any) => {
           if (res) {
-            this.paymentData = res
+            this.paymentData = res.data;
+            if (this.paymentData.status === 'succeeded') {
+              await this.updateOrderAfterPayment(this.paymentData);
+            }
           }
         })
       }
     } catch (error) {
       console.error(error)
     }
+  }
+
+  async updateOrderAfterPayment(orderDetail: any) {
+    let tokenData = null;
+    const authToken = this.localStorageService.getItem('orderData');
+    if (authToken) {
+      tokenData = JSON.parse(authToken);
+    }
+    try {
+      let transactionPayment = [];
+      transactionPayment.push({
+        _id: this.generateRandomString(24),
+        userInfo: '',
+        userSessionId: this.generateRandomString(16),
+        paymentInfo: {
+          amount: (orderDetail.amount_received / 100),
+          type: 'card'
+        },
+        paid: true,
+      });
+      const payload = {
+        status: 'Processing',
+        payment: transactionPayment
+      }
+      this.httpClient.put(`${environment.serverUrl}/posapi/location/${orderDetail.metadata.location}/order/${orderDetail.metadata.order}/update`, payload, { headers: new HttpHeaders({'Authorization': tokenData.userToken }) }).subscribe((res: any) => {
+        console.log('res: ', res);
+      })
+    } catch (error) {
+      console.error(error)
+    }
+  }
+
+  generateRandomString = (length: any) => {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    const charactersLength = characters.length;
+    let result = '';
+    for (var i = 0; i < length; i++) {
+      result += characters.charAt(Math.floor(Math.random() * charactersLength));
+    }
+    return result;
   }
 
 }
